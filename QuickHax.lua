@@ -4,11 +4,17 @@ QuickHax = {}
 local ready = false
 local items = {}
 
-local function newItem (label, fn)
+local function newItem (label, fn, defaultQuantity, max, min, formatString--[[string]])
   local item = {}
   item.label = label
   item.filter = item.label:upper()
   item.exec = fn
+  item.value = defaultQuantity
+  item.defaultValue = defaultQuantity
+  item.min = min or 0
+  item.max = max or ((defaultQuantity * 10) % 100000)
+  item.formatString = formatString or "%d"
+
   table.insert(items, item)
   return item
 end
@@ -22,15 +28,16 @@ local function CommandToLuaFn(cmd)
         -- local pType = cmd.params[params[i]]
         cmd.params[cmd.paramOrder[i]] = tostring(v)
       end
-      -- local paramsString = 
-      -- print("function params:  " .. paramsString)
       local params = utils.map(cmd.args, function(v) return string.gsub(v, "%$(%w+)%$", cmd.params) end)
-      params[#params] = tonumber(params[#params])
-      -- utils.print_r(params)
-      -- print("yay!")
-      return function()
+      -- params[#params] = tonumber(params[#params])
+      params[#params+1] = 0
+      
+      return function(n)
+        params[#params] = n
+        print("params:")
+        utils.print_r(params)
         print("running")
-        cmd.func(table.unpack(params))
+        cmd.func(table.unpack(params))  
         print("done")
       end
     else
@@ -42,44 +49,42 @@ end
 local function prepareItemList(commands)
 	items = {}
 
-  local defaultQuantity = 100
-  local rarityTypes = {"Legendary", "Epic", "Rare", "Uncommon", "Common"}
+  local rarityTypes = {"Common", "Uncommon", "Rare", "Epic", "Legendary"}
   local devPointTypes = {"Primary", "Attribute"}
 
 	for _, command in pairs(commands) do
 		local cmdName = command.name
     local cmdFn = CommandToLuaFn(command)
-    print("looping through commands")
+    local cmdMin, cmdMax = command.quantityLimits.min, command.quantityLimits.max
+
     local fn = function() print("fake fn called") end
+    
     if cmdName == 'Add Material' then
-      defaultQuantity = 100
       for _, rarity in pairs(rarityTypes) do
-        lastPart = ' Components'
-        if rarity == rarityTypes[0] or rarity == rarityTypes[1] then
-          fn = cmdFn(rarity, 2, defaultQuantity)
-          lastPart = ' Upgrade' .. lastPart
-          newItem('Add ' .. tostring(defaultQuantity) .. ' ' .. rarity .. lastPart, fn)
-        else
-          fn = cmdFn(rarity, 1, defaultQuantity)
-          newItem('Add ' .. tostring(defaultQuantity) .. ' ' .. rarity .. lastPart, fn)
+        local lastPart = ' Components'
+        fn = cmdFn(rarity, 1)
+        newItem('Add ' .. rarity .. lastPart, fn, 100, cmdMax, cmdMin)
+        if rarity == rarityTypes[#rarityTypes] or rarity == rarityTypes[#rarityTypes-1] or rarity == rarityTypes[#rarityTypes-2] then
+          lastPart = ' Upgrade'..lastPart
+          fn = cmdFn(rarity, 2)
+          newItem('Add '.. rarity .. lastPart, fn, 100, cmdMax, cmdMin)
         end
+        
       end
 		elseif cmdName == 'Give Dev Points' then
-      defaultQuantity = 12
       for _, pointType in pairs(devPointTypes) do
-        fn = cmdFn(pointType, defaultQuantity)
-        newItem('Give ' .. tostring(defaultQuantity) .. ' ' .. pointType .. ' points', fn)
+        fn = cmdFn(pointType)
+        newItem('Give ' .. pointType .. ' points', fn, 12, cmdMax, cmdMin)
       end
     else
-      defaultQuantity = 1250
-      fn = cmdFn(defaultQuantity)
-      newItem('Add ' .. tostring(defaultQuantity) .. ' money', fn)
+      fn = cmdFn()
+      newItem('Add' .. ' money', fn, 1000, cmdMax, cmdMin, "$%d")
     end
 	end
 
-	table.sort(items, function(a, b)
-		return a.label < b.label
-	end)
+	-- table.sort(items, function(a, b)
+	-- 	return a.label < b.label
+	-- end)
 end
 
 
@@ -93,32 +98,28 @@ function QuickHax.Init()
       params = {
         rarity = "string", -- could be enum
         isUpgrade = "boolean", -- true == upgrade component, false == regular
-        quantity = "number"
       },
-      paramOrder = {"rarity", "isUpgrade", "quantity"},
+      paramOrder = {"rarity", "isUpgrade"},
       args = {'Items.$rarity$Material$isUpgrade$', '$quantity$'},
-      fmt = '"Items.$rarity$Material$isUpgrade$", $quantity$'
+      quantityLimits = {min = 1, max = 1000},
     },
     {
       name = 'Give Dev Points', 
       func = function(t,q) Game.GiveDevPoints(t,q) end, 
       params = {
         pointType = "string",
-        quantity = "number"
       },
-      paramOrder = {"pointType", "quantity"},
-      args = {'$pointType$', '$quantity$'},
-      fmt = '"$pointType$", $quantity$'
+      paramOrder = {"pointType"},
+      args = {'$pointType$'},
+      quantityLimits = {min = 1, max = 30},
     },
     {
       name = 'Add Money', 
       func = function(q) Game.AddToInventory('Items.money', q) end,
-      params = {
-        quantity = "number"
-      },
-      paramOrder = {"quantity"},
-      args = {'$quantity$'},
-      fmt = "'Items.money', $quantity$"
+      params = {},
+      paramOrder = {},
+      args = {},
+      quantityLimits = {min = 1, max = 50000},
     }
   }
   print("preparing item list")

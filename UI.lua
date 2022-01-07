@@ -6,6 +6,7 @@ local state = {
 	open = false,
 	filter = '',
 	selected = nil,
+	value = 2,
 }
 
 local logic = {
@@ -86,15 +87,6 @@ function UI.Draw()
 			ImGui.PopStyleColor()
 
 			ImGui.Spacing()
-			
-			-- local value, used = ImGui.SliderInt("Label", state.value, 0, 100, "%d")
-
-			-- if used then
-			-- 	state.value = value
-			-- 	print(value)
-			-- end
-
-			ImGui.Spacing()
 
 			ImGui.PushStyleColor(ImGuiCol.FrameBg, 0)
 			ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 0)
@@ -116,13 +108,18 @@ function UI.Draw()
 				ImGui.Separator()
 				ImGui.Spacing()
 
+				local value, used = ImGui.SliderInt("Enter value", state.selected.value, state.selected.min, state.selected.max, state.selected.formatString)
+				if used then state.selected.value = value end
+
+				ImGui.Spacing()
+
 				ImGui.PushStyleColor(ImGuiCol.Text, 0xfffefd01)
 				ImGui.Text(state.selected.label)
 				ImGui.PopStyleColor()
 
 				ImGui.Spacing()
-
 				if ImGui.Button('Execute', style.windowWidth, style.buttonHeight) then
+					print("value: " .. tostring(state.selected.value))
 					logic.execute(state.selected)
 				end
 			end

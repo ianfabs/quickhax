@@ -17,7 +17,7 @@ registerForEvent('onInit', function()
 		local player = Game.GetPlayer()
 		-- local itemId = ItemID.FromTDBID(iconicMod.recorId)
 
-		command.exec()
+		command.exec(command.value)
 	end)
 end)
 
